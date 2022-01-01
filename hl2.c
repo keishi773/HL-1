@@ -2,8 +2,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-// stringをunsigned char *の代用にする
-typedef unsigned char *string;
+// Stringをunsigned char *の代用にする
+typedef unsigned char *String;
 
 // コマンドライン引数で指定されたソースファイルを配列変数に読み込む
 void loadText(int argc, const char **argv, unsigned char *t, int siz)
@@ -28,49 +28,39 @@ void loadText(int argc, const char **argv, unsigned char *t, int siz)
     t[i] = 0;
 }
 
-// トークンコードの最大値
-#define MAX_TC 1000
-// トークンの内容（文字列）を記憶
-String ts[MAX_TC + 1];
-// トークンの長さ
-int tl[MAX_TC + 1];
-// トークン1つ辺り平均10バイト
-unsigned char tcBuf[(MAX_TC + 1) * 10];
+#define MAX_TC  1000 // トークンコードの最大値.
+String ts[MAX_TC + 1]; // トークンの内容(文字列)を記憶.
+int tl[MAX_TC + 1]; // トークンの長さ.
+unsigned char tcBuf[(MAX_TC + 1) * 10]; // トークン1つ当たり平均10バイトを想定.
 int tcs = 0, tcb = 0;
 
 //　変数
-int val[MAX_TC + 1];
+int var[MAX_TC + 1];
 
-// トークン番号を得るための関数
-int getTc(String s, int len)
+int getTc(String s, int len) // トークン番号を得るための関数.
 {
     int i;
-    // 登録済みの中から探す
-    for (i = 0; i < tcs; i++) {
-        // 発見
-        break;
+    for (i = 0; i < tcs; i++) { // 登録済みの中から探す.
+        if (len == tl[i] && strncmp(s, ts[i], len) == 0)
+            break; // 発見
     }
     if (i == tcs) {
         if (tcs >= MAX_TC) {
             printf("too many tokens\n");
             exit(1);
         }
-        // 見つからなかったので新規登録
-        strncpy(&tcBuf[tcb], s, len);
-        // 終端文字コード
-        tcBuf[tcb + len] = 0;
+        strncpy(&tcBuf[tcb], s, len); // 見つからなかったので新規登録.
+        tcBuf[tcb + len] = 0; // 終端文字コード.
         ts[i] = &tcBuf[tcb];
         tl[i] = len;
         tcb += len + 1;
         tcs++;
-        // 定数だった場合に初期値を設定(定数でないときは0になる)
-        var[i] = strtol(ts[i], 0, 0);
+        var[i] = strtol(ts[i], 0, 0);	// 定数だった場合に初期値を設定（定数ではないときは0になる）.
     }
     return i;
 }
 
-// 変数名に使用できる藻位ｊかどうか
-int isAlphabetOrNumber(unsigned char c)
+int isAlphabetOrNumber(unsigned char c)		// 変数名に使用できる文字かどうか.
 {
     if ('0' <= c && c <= '9') return 1;
     if ('a' <= c && c <= 'z') return 1;
@@ -79,39 +69,63 @@ int isAlphabetOrNumber(unsigned char c)
     return 0;
 }
 
-// プログラムをトークンコード列に変換する
-int lexer(String s, int tc[])
+int lexer(String s, int tc[])		// プログラムをトークンコード列に変換する.
 {
-    // i:今s[]のどこを読んでいるか、j:これまでに変換したトークン列の長さ
-    int i = 0, j = 0, len;
-    for(;;) {
-        // スペース、タブ、改行
-        if (s[i] == ' ' || s[i] == '\n' || s[i] == '\r') {
+    int i = 0, j = 0, len; // i:今s[]のどこを読んでいるか、j:これまでに変換したトークン列の長さ.
+    for (;;) {
+        if (s[i] == ' ' || s[i] == '\t' || s[i] == '\n' || s[i] == '\r') {	// スペース、タブ、改行.
             i++;
             continue;
         }
-        // ファイル終端
-        if (s[i] == 0) {
+        if (s[i] == 0)	// ファイル終端.
             return j;
-        }
         len = 0;
-        // 一文字目記号
-        if (strchr("(){}[];,", s[i] != 0)) {
+        if (strchr("(){}[];,", s[i]) != 0) {	// 1文字記号.
             len = 1;
-        // 一文字目が英数字
-        } else if (isAlphabetOrNumber(s[i])) {
-            while(isAlphabetOrNumber(s[i + len]))
-               len++;
-        // 一文字目が普通の記号
-        } else if (strchr("=+-*/!%&~|<>?:.#", s[i] != 0)) {
+        } else if (isAlphabetOrNumber(s[i])) {  // 1文字目が英数字.
+            while (isAlphabetOrNumber(s[i + len]))
+                len++;
+        } else if (strchr("=+-*/!%&~|<>?:.#", s[i]) != 0) {  // 1文字目が普通の記号.
             while (strchr("=+-*/!%&~|<>?:.#", s[i + len]) != 0 && s[i + len] != 0)
                 len++;
         } else {
-            printf("syntax error: %.10s\n", &s[i]);
+            printf("syntax error : %.10s\n", &s[i]);
             exit(1);
         }
         tc[j] = getTc(&s[i], len);
         i += len;
         j++;
     }
+}
+
+
+//　トークンコード
+int tc[10000];
+
+int main(int argc, const char **argv)
+{
+    int pc, pc1;
+    unsigned char txt[10000]; // ソースコード用のバッファ.
+    loadText(argc, argv, txt, 10000);
+    pc1 = lexer(txt, tc);
+    tc[pc1] = tc[pc1 + 1] = tc[pc1 + 2] = tc[pc1 + 3] = getTc(".", 1);	// エラー表示用のために末尾にピリオドを登録しておく.
+    int semi = getTc(";", 1);
+    for (pc = 0; pc < pc1; pc++) { // プログラム実行開始.
+        if (tc[pc + 1] == getTc("=", 1) && tc[pc + 3] == semi) { // 単純代入.
+            var[tc[pc]] = var[tc[pc + 2]];
+        } else if (tc[pc + 1] == getTc("=", 1) && tc[pc + 3] == getTc("+", 1) && tc[pc + 5] == semi) {  // 加算.
+            var[tc[pc]] = var[tc[pc + 2]] + var[tc[pc + 4]];
+        } else if (tc[pc + 1] == getTc("=", 1) && tc[pc + 3] == getTc("-", 1) && tc[pc + 5] == semi) {  // 減算.
+            var[tc[pc]] = var[tc[pc + 2]] - var[tc[pc + 4]];
+        } else if (tc[pc] == getTc("print", 5) && tc[pc + 2] == semi) { // print.
+            printf("%d\n", var[tc[pc + 1]]);
+        } else
+            goto err;
+        while (tc[pc] != semi)
+            pc++;
+    }
+    exit(0);
+err:
+    printf("syntax error : %s %s %s %s\n", ts[tc[pc]], ts[tc[pc + 1]], ts[tc[pc + 2]], ts[tc[pc + 3]]);
+    exit(1);
 }
